@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Receipt Logger</title>
+<meta name="description" content="Scan, clean up and OCR receipts, then keep a simple expense log.">
+<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141413" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Receipts">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<style>
+:root{
+  --bg:#f6f5f2; --card:#ffffff; --ink:#1c1b19; --muted:#6b6862; --line:#e4e1da; --soft:#efede8;
+  --accent:#0f766e; --accent-ink:#ffffff; --danger:#b42318; --r:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#141413; --card:#1e1e1c; --ink:#ecebe7; --muted:#a19d94; --line:#34332f; --soft:#272724;
+         --accent:#2dd4bf; --accent-ink:#06201d; --danger:#f97066; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%;padding-bottom:env(safe-area-inset-bottom);-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+main{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+.install{display:flex;gap:10px;align-items:flex-start;background:color-mix(in srgb,var(--accent) 12%,var(--card));border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:var(--r);padding:12px 14px;margin-bottom:14px;font-size:14px}
+.install p{margin:0;flex:1}
+.install button{background:none;border:0;color:var(--muted);font-size:20px;line-height:1;padding:0 2px;cursor:pointer}
+.share-ic{display:inline-block;vertical-align:-3px;width:16px;height:18px}
+header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 10px) 16px 0}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:760px;margin:0 auto}
+h1{font-size:19px;margin:0;letter-spacing:-.01em}
+h2{font-size:16px;margin:0 0 10px}
+.tabs{display:flex;gap:4px;max-width:760px;margin:8px auto 0}
+.tabs button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;padding:10px 0 12px;border-bottom:2px solid transparent;cursor:pointer}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+.pill{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:var(--soft);font-size:12px;color:var(--muted)}
+main{max-width:760px;margin:0 auto;padding:14px 12px 40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.muted{color:var(--muted)} .small{font-size:13px}
+.hint{color:var(--muted);font-size:13px;margin:10px 2px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn,button.t{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;padding:10px 14px;border-radius:11px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.btn:active,button.t:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--danger)}
+.btn.big{padding:16px;font-size:16px;flex:1;min-width:140px}
+.btn.wide{width:100%;margin-top:12px;padding:14px}
+.btn[disabled]{opacity:.5;pointer-events:none}
+.link{background:none;border:0;color:var(--accent);font:inherit;padding:10px 2px 0;cursor:pointer;text-decoration:underline}
+.tools{margin-top:10px}
+.tools button{flex:1}
+.stage{position:relative;display:flex;justify-content:center;background:#111;border-radius:10px;overflow:hidden}
+.stage.light{background:repeating-conic-gradient(#ddd 0 25%,#f4f4f4 0 50%) 0 0/16px 16px;padding:8px}
+#crop{touch-action:none;display:block;cursor:crosshair}
+#out{display:block;max-width:100%;max-height:70vh;box-shadow:0 1px 6px rgba(0,0,0,.25)}
+.controls{display:grid;gap:10px;margin-top:12px}
+.chk{display:flex;align-items:center;gap:10px}
+.chk input{width:20px;height:20px;accent-color:var(--accent)}
+.seg{display:flex;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--card);color:var(--muted);font:inherit;font-weight:600;padding:9px;cursor:pointer}
+.seg button.on{background:var(--soft);color:var(--ink)}
+.slider{display:flex;align-items:center;gap:10px}
+.slider input{flex:1;accent-color:var(--accent)}
+.slider span{font-variant-numeric:tabular-nums;width:36px;text-align:right;color:var(--muted)}
+.progress{margin-top:12px;height:28px;background:var(--soft);border-radius:8px;position:relative;overflow:hidden}
+.progress>div{position:absolute;inset:0 auto 0 0;width:0;background:color-mix(in srgb,var(--accent) 30%,transparent);transition:width .2s}
+.progress>span{position:relative;display:block;text-align:center;line-height:28px;font-size:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid .full{grid-column:1/-1}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 10px;width:100%;min-width:0}
+textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.4}
+input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 50%,transparent);border-color:var(--accent)}
+details{margin-top:12px} summary{cursor:pointer;font-weight:600;padding:6px 0}
+.filters select,.filters input{flex:1;min-width:110px}
+.sum{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px}
+.sum b{font-size:24px;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{background:var(--soft);border-radius:20px;padding:4px 10px;font-size:12px;color:var(--muted)}
+.chip b{color:var(--ink);font-weight:600}
+.item{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:8px;cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit}
+.item img,.item .ph{width:46px;height:58px;object-fit:cover;object-position:top;border-radius:6px;background:var(--soft);flex:none;border:1px solid var(--line)}
+.item .m{flex:1;min-width:0}
+.item .m div:first-child{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .amt{font-weight:700;font-variant-numeric:tabular-nums}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+dialog{border:0;border-radius:var(--r);padding:0;width:min(560px,calc(100% - 20px));max-height:calc(100% - 30px);background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg-body{padding:16px;overflow:auto}
+.dlg-img{display:block;max-width:100%;max-height:300px;margin:0 auto 12px;border:1px solid var(--line);border-radius:6px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(120px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;transition:transform .25s;z-index:50;max-width:90vw;text-align:center}
+#toast.show{transform:translateX(-50%) translateY(0)}
+.warn{font-size:12px;color:var(--danger)}
+.drop{outline:2px dashed var(--accent);outline-offset:-6px}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar"><h1>Receipt Logger</h1><span class="warn" id="storeWarn"></span></div>
+  <nav class="tabs">
+    <button data-tab="scan" class="on">Scan</button>
+    <button data-tab="log">Log <span class="pill" id="logCount">0</span></button>
+  </nav>
+</header>
+
+<main>
+<section id="tab-scan">
+  <div class="install" id="installTip" hidden>
+    <p><b>Install on your iPhone:</b> tap Share
+      <svg class="share-ic" viewBox="0 0 16 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V1.5M4.5 4.5 8 1l3.5 3.5"/><path d="M5 7.5H2.5v9h11v-9H11"/></svg>
+      in Safari, then <b>Add to Home Screen</b>. It then opens full-screen and works offline.</p>
+    <button id="installClose" aria-label="Dismiss">×</button>
+  </div>
+  <div class="card" id="pickCard">
+    <div class="row">
+      <label class="btn primary big"><input type="file" accept="image/*" capture="environment" id="camIn" hidden>Take photo</label>
+      <label class="btn big"><input type="file" accept="image/*" id="fileIn" hidden>Choose image</label>
+    </div>
+    <p class="hint">Best results: receipt flat-ish on a darker surface, good light, fill the frame. You can also paste or drop an image here.</p>
+    <button class="link" id="manualBtn">Log one manually without a photo</button>
+  </div>
+
+  <div class="card" id="cropCard" hidden>
+    <div class="card-h"><h2>1 · Corners &amp; perspective</h2><span class="muted small" id="cropMsg"></span></div>
+    <div class="stage" id="cropStage"><canvas id="crop"></canvas></div>
+    <div class="row tools">
+      <button class="t" id="autoBtn">Auto-detect</button>
+      <button class="t" id="fullBtn">Whole image</button>
+      <button class="t" id="rotSrcBtn">Rotate 90°</button>
+    </div>
+    <button class="btn primary wide" id="procBtn">Straighten &amp; clean up</button>
+  </div>
+
+  <div class="card" id="procCard" hidden>
+    <h2>2 · Cleaned image</h2>
+    <div class="stage light"><canvas id="out"></canvas></div>
+    <div class="muted small" id="procInfo" style="margin-top:8px"></div>
+    <div class="controls">
+      <label class="chk"><input type="checkbox" id="optDeskew" checked> Auto-rotate to align text (deskew)</label>
+      <label class="chk"><input type="checkbox" id="optDewarp" checked> Unwarp curled / bent paper</label>
+      <div class="seg" id="modeSeg"><button data-mode="binary" class="on">Black &amp; white</button><button data-mode="gray">Grayscale</button></div>
+      <label class="slider">Threshold <input type="range" id="optThr" min="0.50" max="0.92" step="0.01" value="0.72"><span id="thrVal">0.72</span></label>
+      <div class="row"><button class="t" id="rotL" style="flex:1">↺ 90°</button><button class="t" id="rot180" style="flex:1">180°</button><button class="t" id="rotR" style="flex:1">↻ 90°</button></div>
+      <label class="chk"><input type="checkbox" id="optFlip" checked> If OCR looks bad, also try upside-down</label>
+    </div>
+    <button class="btn primary wide" id="ocrBtn">Read text (OCR)</button>
+    <div class="progress" id="ocrProg" hidden><div></div><span>Starting…</span></div>
+  </div>
+
+  <div class="card" id="resCard" hidden>
+    <h2>3 · Review &amp; log</h2>
+    <form id="entryForm" onsubmit="return false"></form>
+    <details id="ocrDetails"><summary>Recognized text <span class="muted small" id="confVal"></span></summary>
+      <textarea id="ocrText" rows="12" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:8px"><button class="t" id="reparseBtn">Re-fill fields from text</button><button class="t" id="copyTextBtn">Copy text</button></div>
+    </details>
+    <button class="btn primary wide" id="saveBtn">Save to log</button>
+    <button class="link" id="newBtn">Start a new receipt</button>
+  </div>
+</section>
+
+<section id="tab-log" hidden>
+  <div class="card">
+    <div class="row filters">
+      <select id="fMonth"></select>
+      <select id="fCat"></select>
+      <input id="fSearch" type="search" placeholder="Search merchant, notes, text">
+    </div>
+    <div class="sum"><span class="muted" id="sumLabel">0 receipts</span><b id="sumTotal">$0.00</b></div>
+    <div class="chips" id="catChips"></div>
+  </div>
+  <div id="list"></div>
+  <div class="card">
+    <div class="row">
+      <button class="t" id="csvBtn" style="flex:1">Export CSV</button>
+      <button class="t" id="copyCsvBtn" style="flex:1">Copy CSV</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="t" id="jsonBtn" style="flex:1">Backup (JSON)</button>
+      <label class="btn" style="flex:1"><input type="file" id="importIn" accept="application/json,.json" hidden>Restore / import</label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="f" style="flex:1">Currency
+        <select id="currencySel"><option>USD</option><option>EUR</option><option>GBP</option><option>CAD</option><option>AUD</option><option>JPY</option><option>INR</option><option>MXN</option><option>CHF</option></select>
+      </label>
+    </div>
+    <p class="hint">Everything is stored only in this browser (localStorage). Back up now and then.</p>
+  </div>
+</section>
+</main>
+
+<dialog id="dlg">
+  <div class="dlg-body">
+    <img class="dlg-img" id="dlgImg" alt="">
+    <form id="dlgForm" onsubmit="return false"></form>
+    <details><summary>Recognized text</summary><textarea id="dlgText" rows="10" spellcheck="false"></textarea></details>
+    <div class="row" style="margin-top:14px">
+      <button class="btn danger" id="dlgDel">Delete</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="dlgClose">Cancel</button>
+      <button class="btn primary" id="dlgSave">Save</button>
+    </div>
+  </div>
+</dialog>
+<datalist id="payList"><option>Cash</option><option>Visa</option><option>Mastercard</option><option>Amex</option><option>Discover</option><option>Debit</option><option>Apple Pay</option><option>Google Pay</option></datalist>
+<div id="toast"></div>
+
+<!-- ================= Core image processing + parsing (pure functions) ================= -->
+<script id="core">
+const Core = (() => {
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+  // ---------- basic image helpers (single-channel Float32 images {w,h,d}) ----------
+  function grayFromRGBA(w, h, px) {
+    const d = new Float32Array(w * h);
+    for (let i = 0, j = 0; i < d.length; i++, j += 4) d[i] = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
+    return { w, h, d };
+  }
+
+  function downscale(img, maxDim) {
+    const sc = Math.min(1, maxDim / Math.max(img.w, img.h));
+    if (sc >= 1) return { img, sx: 1, sy: 1 };
+    const nw = Math.max(1, Math.round(img.w * sc)), nh = Math.max(1, Math.round(img.h * sc));
+    const fx = img.w / nw, fy = img.h / nh, out = new Float32Array(nw * nh), d = img.d, W = img.w;
+    for (let y = 0; y < nh; y++) {
+      const y0 = Math.floor(y * fy), y1 = Math.max(y0 + 1, Math.min(img.h, Math.floor((y + 1) * fy)));
+      for (let x = 0; x < nw; x++) {
+        const x0 = Math.floor(x * fx), x1 = Math.max(x0 + 1, Math.min(W, Math.floor((x + 1) * fx)));
+        let s = 0;
+        for (let yy = y0; yy < y1; yy++) { const r = yy * W; for (let xx = x0; xx < x1; xx++) s += d[r + xx]; }
+        out[y * nw + x] = s / ((y1 - y0) * (x1 - x0));
+      }
+    }
+    return { img: { w: nw, h: nh, d: out }, sx: nw / img.w, sy: nh / img.h };
+  }
+
+  function boxBlur(img, r) {
+    const { w, h, d } = img, tmp = new Float32Array(w * h), out = new Float32Array(w * h), n = 2 * r + 1;
+    for (let y = 0; y < h; y++) {
+      const o = y * w; let s = 0;
+      for (let x = -r; x <= r; x++) s += d[o + clamp(x, 0, w - 1)];
+      for (let x = 0; x < w; x++) { tmp[o + x] = s / n; s += d[o + Math.min(w - 1, x + r + 1)] - d[o + Math.max(0, x - r)]; }
+    }
+    for (let x = 0; x < w; x++) {
+      let s = 0;
+      for (let y = -r; y <= r; y++) s += tmp[clamp(y, 0, h - 1) * w + x];
+      for (let y = 0; y < h; y++) { out[y * w + x] = s / n; s += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x]; }
+    }
+    return { w, h, d: out };
+  }
+
+  function otsu(d) {
+    const hist = new Float64Array(256);
+    for (let i = 0; i < d.length; i++) hist[clamp(d[i] | 0, 0, 255)]++;
+    let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sumB = 0, wB = 0, best = -1, thr = 128;
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t]; if (!wB) continue;
+      const wF = d.length - wB; if (!wF) break;
+      sumB += t * hist[t];
+      const mB = sumB / wB, mF = (sum - sumB) / wF, between = wB * wF * (mB - mF) * (mB - mF);
+      if (between > best) { best = between; thr = t; }
+    }
+    return thr;
+  }
+
+  function morph(m, w, h, r, dilate) {
+    const t = new Uint8Array(w * h), o = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = dilate ? 0 : 1;
+      for (let k = -r; k <= r; k++) {
+        const xx = x + k; if (xx < 0 || xx >= w) continue;
+        const q = m[y * w + xx];
+        if (dilate) { if (q) { v = 1; break; } } else if (!q) { v = 0; break; }
+      }
+      t[y * w + x] = v;
+    }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = dilate ? 0 : 1;
+      for (let k = -r; k <= r; k++) {
+        const yy = y + k; if (yy < 0 || yy >= h) continue;
+        const q = t[yy * w + x];
+        if (dilate) { if (q) { v = 1; break; } } else if (!q) { v = 0; break; }
+      }
+      o[y * w + x] = v;
+    }
+    return o;
+  }
+
+  function sample(d, W, H, x, y, fill) {
+    if (x < -0.5 || y < -0.5 || x > W - 0.5 || y > H - 0.5) return fill;
+    let x0 = Math.floor(x), y0 = Math.floor(y);
+    const fx = x - x0, fy = y - y0;
+    let x1 = x0 + 1, y1 = y0 + 1;
+    if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0; if (x1 > W - 1) x1 = W - 1; if (y1 > H - 1) y1 = H - 1;
+    if (x0 > W - 1) x0 = W - 1; if (y0 > H - 1) y0 = H - 1;
+    const a = d[y0 * W + x0], b = d[y0 * W + x1], c = d[y1 * W + x0], e = d[y1 * W + x1];
+    const top = a + (b - a) * fx, bot = c + (e - c) * fx;
+    return top + (bot - top) * fy;
+  }
+
+  // ---------- linear algebra ----------
+  function solve(A, b) {
+    const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+    for (let c = 0; c < n; c++) {
+      let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      if (Math.abs(M[p][c]) < 1e-12) return null;
+      [M[c], M[p]] = [M[p], M[c]];
+      for (let r = 0; r < n; r++) {
+        if (r === c) continue;
+        const f = M[r][c] / M[c][c];
+        for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+      }
+    }
+    return M.map((r, i) => r[n] / r[i]);
+  }
+
+  // H maps "from" points to "to" points (8 params, h33 = 1)
+  function homography(from, to) {
+    const A = [], b = [];
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = from[i], [X, Y] = to[i];
+      A.push([x, y, 1, 0, 0, 0, -X * x, -X * y]); b.push(X);
+      A.push([0, 0, 0, x, y, 1, -Y * x, -Y * y]); b.push(Y);
+    }
+    const h = solve(A, b);
+    if (!h) return null;
+    h.push(1); return h;
+  }
+
+  // ---------- geometry ----------
+  function convexHull(P) {
+    P = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    for (const p of P) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+    for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+    up.pop(); lo.pop(); return lo.concat(up);
+  }
+  const polyArea = p => { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[i], r = p[(i + 1) % p.length]; a += q[0] * r[1] - r[0] * q[1]; } return Math.abs(a) / 2; };
+
+  // Reduce convex polygon to k vertices by repeatedly dropping the vertex that removes the least area.
+  function reduceToK(poly, k) {
+    const idx = poly.map((_, i) => i);
+    while (idx.length > k) {
+      let mi = 0, ma = Infinity;
+      for (let i = 0; i < idx.length; i++) {
+        const a = poly[idx[(i - 1 + idx.length) % idx.length]], b = poly[idx[i]], c = poly[idx[(i + 1) % idx.length]];
+        const ar = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+        if (ar < ma) { ma = ar; mi = i; }
+      }
+      idx.splice(mi, 1);
+    }
+    return idx;
+  }
+
+  function lineIntersect(p1, p2, p3, p4) {
+    const d = (p1[0] - p2[0]) * (p3[1] - p4[1]) - (p1[1] - p2[1]) * (p3[0] - p4[0]);
+    if (Math.abs(d) < 1e-9) return null;
+    const a = p1[0] * p2[1] - p1[1] * p2[0], b = p3[0] * p4[1] - p3[1] * p4[0];
+    return [(a * (p3[0] - p4[0]) - (p1[0] - p2[0]) * b) / d, (a * (p3[1] - p4[1]) - (p1[1] - p2[1]) * b) / d];
+  }
+
+  function orderCorners(pts) {
+    const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    const s = pts.slice().sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+    let k = 0; for (let i = 1; i < 4; i++) if (s[i][0] + s[i][1] < s[k][0] + s[k][1]) k = i;
+    return [0, 1, 2, 3].map(i => s[(i + k) % 4]); // TL, TR, BR, BL
+  }
+
+  // ---------- 1. find the receipt (bright paper region) ----------
+  function detectCorners(g) {
+    const { img: s0, sx, sy } = downscale(g, 480);
+    const { w, h } = s0;
+    const s = boxBlur(boxBlur(s0, 2), 2);
+    const t = otsu(s.d);
+    let m = new Uint8Array(w * h);
+    for (let i = 0; i < m.length; i++) m[i] = s.d[i] > t ? 1 : 0;
+    m = morph(morph(m, w, h, 2, false), w, h, 2, true); // opening: cut thin bridges to other bright stuff
+
+    const lab = new Int32Array(w * h), stack = new Int32Array(w * h);
+    let best = -1, bestScore = 0, next = 1;
+    for (let i = 0; i < w * h; i++) {
+      if (!m[i] || lab[i]) continue;
+      let sp = 0, a = 0, touch = 0; stack[sp++] = i; lab[i] = next;
+      while (sp) {
+        const p = stack[--sp]; a++;
+        const x = p % w, y = (p / w) | 0;
+        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) touch++;
+        if (x > 0 && m[p - 1] && !lab[p - 1]) { lab[p - 1] = next; stack[sp++] = p - 1; }
+        if (x < w - 1 && m[p + 1] && !lab[p + 1]) { lab[p + 1] = next; stack[sp++] = p + 1; }
+        if (y > 0 && m[p - w] && !lab[p - w]) { lab[p - w] = next; stack[sp++] = p - w; }
+        if (y < h - 1 && m[p + w] && !lab[p + w]) { lab[p + w] = next; stack[sp++] = p + w; }
+      }
+      const score = a * (touch > (w + h) ? 0.5 : 1); // slightly prefer regions not hugging the frame
+      if (score > bestScore) { bestScore = score; best = next; }
+      next++;
+    }
+    if (best < 0) return null;
+    const pts = []; let area = 0;
+    for (let y = 0; y < h; y++) {
+      let l = -1, r = -1;
+      for (let x = 0; x < w; x++) if (lab[y * w + x] === best) { if (l < 0) l = x; r = x; area++; }
+      if (l >= 0) { pts.push([l, y], [r + 1, y], [l, y + 1], [r + 1, y + 1]); }
+    }
+    if (area < 0.06 * w * h || area > 0.97 * w * h) return null;
+    const hull = convexHull(pts);
+    if (hull.length < 4) return null;
+    const qi = reduceToK(hull, 4);
+    let quad = qi.map(i => hull[i]);
+    // Refine: each side = line through the longest hull edge between consecutive quad vertices
+    const n = hull.length, lines = [];
+    for (let k = 0; k < 4; k++) {
+      let i = qi[k], end = qi[(k + 1) % 4], bestL = -1, seg = null;
+      while (i !== end) {
+        const j = (i + 1) % n, L = Math.hypot(hull[j][0] - hull[i][0], hull[j][1] - hull[i][1]);
+        if (L > bestL) { bestL = L; seg = [hull[i], hull[j]]; }
+        i = j;
+      }
+      lines.push(seg);
+    }
+    const diag = Math.hypot(w, h);
+    const refined = quad.map((q, k) => {
+      const A = lines[(k + 3) % 4], B = lines[k];
+      const p = A && B ? lineIntersect(A[0], A[1], B[0], B[1]) : null;
+      if (!p || Math.hypot(p[0] - q[0], p[1] - q[1]) > 0.08 * diag || p[0] < -2 || p[1] < -2 || p[0] > w + 2 || p[1] > h + 2) return q;
+      return [clamp(p[0], 0, w), clamp(p[1], 0, h)];
+    });
+    if (polyArea(refined) >= polyArea(quad) * 0.98) quad = refined;
+    return orderCorners(quad.map(([x, y]) => [x / sx, y / sy]));
+  }
+
+  function outputSize(c) {
+    const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    let W = Math.max(d(c[0], c[1]), d(c[3], c[2])), H = Math.max(d(c[0], c[3]), d(c[1], c[2]));
+    let s = W < 1000 ? Math.min(2, 1000 / W) : W > 1800 ? 1800 / W : 1;
+    if (W * H * s * s > 8e6) s = Math.sqrt(8e6 / (W * H));
+    return { w: Math.max(16, Math.round(W * s)), h: Math.max(16, Math.round(H * s)), scale: s };
+  }
+
+  // ---------- 2. perspective warp ----------
+  function warp(src, corners, outW, outH) {
+    const H = homography([[0, 0], [outW, 0], [outW, outH], [0, outH]], corners);
+    const out = new Float32Array(outW * outH), d = src.d, W = src.w, Hh = src.h;
+    for (let v = 0; v < outH; v++) {
+      const vy = v + 0.5;
+      for (let u = 0; u < outW; u++) {
+        const ux = u + 0.5, z = H[6] * ux + H[7] * vy + 1;
+        const x = (H[0] * ux + H[1] * vy + H[2]) / z - 0.5, y = (H[3] * ux + H[4] * vy + H[5]) / z - 0.5;
+        out[v * outW + u] = sample(d, W, Hh, x, y, 0);
+      }
+    }
+    return { w: outW, h: outH, d: out };
+  }
+
+  // ---------- 3. grayscale background normalization (paper -> white, ink -> dark; removes shadows) ----------
+  function normalizeBg(img) {
+    const { w, h, d } = img, B = Math.max(8, Math.round(Math.min(w, h) / 40));
+    const bw = Math.ceil(w / B), bh = Math.ceil(h / B), g = new Float32Array(bw * bh);
+    for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+      // 92nd percentile of the block ≈ paper brightness, robust to glare specks
+      const vals = [];
+      const y1 = Math.min(h, (by + 1) * B), x1 = Math.min(w, (bx + 1) * B);
+      for (let y = by * B; y < y1; y += 2) { const r = y * w; for (let x = bx * B; x < x1; x += 2) vals.push(d[r + x]); }
+      vals.sort((a, b) => a - b);
+      g[by * bw + bx] = vals[Math.min(vals.length - 1, Math.floor(vals.length * 0.92))];
+    }
+    const g2 = new Float32Array(bw * bh);
+    for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+      let m = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const yy = by + dy, xx = bx + dx;
+        if (yy >= 0 && yy < bh && xx >= 0 && xx < bw && g[yy * bw + xx] > m) m = g[yy * bw + xx];
+      }
+      g2[by * bw + bx] = m;
+    }
+    const bg = boxBlur({ w: bw, h: bh, d: g2 }, 1).d;
+    const out = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const gy = clamp((y + 0.5) / B - 0.5, 0, bh - 1), y0 = Math.floor(gy), y1 = Math.min(bh - 1, y0 + 1), fy = gy - y0;
+      for (let x = 0; x < w; x++) {
+        const gx = clamp((x + 0.5) / B - 0.5, 0, bw - 1), x0 = Math.floor(gx), x1 = Math.min(bw - 1, x0 + 1), fx = gx - x0;
+        const a = bg[y0 * bw + x0], b = bg[y0 * bw + x1], c = bg[y1 * bw + x0], e = bg[y1 * bw + x1];
+        const v = (a + (b - a) * fx) * (1 - fy) + (c + (e - c) * fx) * fy;
+        out[y * w + x] = Math.min(255, d[y * w + x] / Math.max(v, 40) * 255);
+      }
+    }
+    return { w, h, d: out };
+  }
+
+  function rot90(img, k) {
+    k = ((k % 4) + 4) % 4; if (!k) return img;
+    const { w, h, d } = img, out = new Float32Array(w * h);
+    const nw = k === 2 ? w : h, nh = k === 2 ? h : w;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const v = d[y * w + x];
+      if (k === 1) out[x * nw + (h - 1 - y)] = v;
+      else if (k === 2) out[(h - 1 - y) * w + (w - 1 - x)] = v;
+      else out[(w - 1 - x) * nw + y] = v;
+    }
+    return { w: nw, h: nh, d: out };
+  }
+
+  // Are text lines running vertically? (compare row vs column projection sharpness)
+  function looksSideways(E) {
+    const { img } = downscale(E, 800), { w, h, d } = img;
+    const rows = new Float32Array(h), cols = new Float32Array(w);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[y * w + x] < 150) { rows[y]++; cols[x]++; }
+    // Text lines leave full-width blank gaps between them; columns of glyphs rarely do.
+    const gapFrac = p => {
+      let mx = 0, a = -1, b = -1;
+      for (let i = 0; i < p.length; i++) { if (p[i] > mx) mx = p[i]; if (p[i] > 0) { if (a < 0) a = i; b = i; } }
+      if (a < 0 || b - a < 10) return 0;
+      let n = 0; for (let i = a; i <= b; i++) if (p[i] <= mx * 0.02) n++;
+      return n / (b - a + 1);
+    };
+    const gr = gapFrac(rows), gc = gapFrac(cols);
+    if (gc > 1.3 * gr) return true;            // clearly vertical text lines
+    if (gr > 1.3 * gc) return false;           // clearly horizontal text lines
+    return E.w > 1.15 * E.h;                   // ambiguous: receipts are almost always portrait
+  }
+
+  // ---------- 4. deskew (projection-profile search) ----------
+  function estimateSkew(E) {
+    const { img } = downscale(E, 1200), { w, h, d } = img;
+    const xs = [], ys = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[y * w + x] < 140) { xs.push(x); ys.push(y); }
+    if (xs.length < 200) return 0;
+    const step = Math.max(1, Math.floor(xs.length / 120000));
+    const score = deg => {
+      const a = deg * Math.PI / 180, s = Math.sin(a), c = Math.cos(a);
+      const off = w * Math.abs(s) + 2, n = Math.ceil(h * c + w * Math.abs(s)) + 4, hist = new Float32Array(n);
+      for (let i = 0; i < xs.length; i += step) { const r = (ys[i] * c - xs[i] * s + off) | 0; if (r >= 0 && r < n) hist[r]++; }
+      let sc = 0; for (let i = 0; i < n; i++) sc += hist[i] * hist[i]; return sc;
+    };
+    let best = 0, bs = -1;
+    for (let a = -10; a <= 10.001; a += 0.5) { const s = score(a); if (s > bs) { bs = s; best = a; } }
+    const c0 = best;
+    for (let a = c0 - 0.5; a <= c0 + 0.501; a += 0.05) { const s = score(a); if (s > bs) { bs = s; best = a; } }
+    return best;
+  }
+
+  function rotate(E, deg) {
+    const { w, h, d } = E, a = deg * Math.PI / 180, s = Math.sin(a), c = Math.cos(a), cx = w / 2, cy = h / 2;
+    const out = new Float32Array(w * h);
+    for (let v = 0; v < h; v++) for (let u = 0; u < w; u++) {
+      const dx = u + 0.5 - cx, dy = v + 0.5 - cy;
+      out[v * w + u] = sample(d, w, h, cx + dx * c - dy * s - 0.5, cy + dx * s + dy * c - 0.5, 255);
+    }
+    return { w, h, d: out };
+  }
+
+  // ---------- 5. dewarp / unwrap curled paper (text-line tracking across vertical strips) ----------
+  function rowPeriod(p) {
+    const n = p.length; let mean = 0; for (let i = 0; i < n; i++) mean += p[i]; mean /= n;
+    const q = new Float32Array(n); for (let i = 0; i < n; i++) q[i] = p[i] - mean;
+    const maxLag = Math.min(250, Math.floor(n / 3)); if (maxLag < 8) return 0;
+    const ac = new Float32Array(maxLag + 2);
+    for (let l = 0; l <= maxLag + 1; l++) { let s = 0; for (let i = 0; i + l < n; i++) s += q[i] * q[i + l]; ac[l] = s / (n - l); }
+    if (ac[0] <= 0) return 0;
+    let mn = ac[0];
+    for (let l = 1; l <= maxLag; l++) {
+      if (ac[l] < mn) mn = ac[l];
+      if (l >= 6 && ac[l] > ac[l - 1] && ac[l] >= ac[l + 1] && mn < 0.3 * ac[0] && ac[l] - mn > 0.15 * ac[0]) return l;
+    }
+    return 0;
+  }
+
+  function matchShift(pa, sa, pb, y0, y1, span) {
+    const n = y1 - y0, A = new Float32Array(n), base = Math.round(sa), L = pa.length;
+    let ma = 0;
+    for (let k = 0; k < n; k++) { const yy = y0 + k + base; A[k] = yy >= 0 && yy < L ? pa[yy] : 0; ma += A[k]; }
+    ma /= n; let va = 0; for (let k = 0; k < n; k++) { A[k] -= ma; va += A[k] * A[k]; }
+    if (va <= 0) return { shift: sa, score: 0 };
+    const scores = [];
+    let best = -2, bi = 0;
+    for (let sb = base - span; sb <= base + span; sb++) {
+      let mb = 0;
+      for (let k = 0; k < n; k++) { const yy = y0 + k + sb; mb += yy >= 0 && yy < L ? pb[yy] : 0; }
+      mb /= n; let cov = 0, vb = 0;
+      for (let k = 0; k < n; k++) { const yy = y0 + k + sb; const v = (yy >= 0 && yy < L ? pb[yy] : 0) - mb; cov += A[k] * v; vb += v * v; }
+      const sc = vb > 0 ? cov / Math.sqrt(va * vb) : -1;
+      scores.push(sc);
+      if (sc > best) { best = sc; bi = scores.length - 1; }
+    }
+    let sub = 0;
+    if (bi > 0 && bi < scores.length - 1) {
+      const a = scores[bi - 1], b = scores[bi], c = scores[bi + 1], den = a - 2 * b + c;
+      if (den < 0) sub = clamp(0.5 * (a - c) / den, -0.5, 0.5);
+    }
+    return { shift: base - span + bi + sub, score: best };
+  }
+
+  function polyFit(T, Y, deg) {
+    const m = deg + 1, A = Array.from({ length: m }, () => new Array(m).fill(0)), b = new Array(m).fill(0);
+    for (let k = 0; k < T.length; k++) {
+      const p = []; for (let i = 0; i < m; i++) p.push(T[k] ** i);
+      for (let i = 0; i < m; i++) { b[i] += p[i] * Y[k]; for (let j = 0; j < m; j++) A[i][j] += p[i] * p[j]; }
+    }
+    const c = solve(A, b) || new Array(m).fill(0);
+    while (c.length < 4) c.push(0);
+    return c;
+  }
+
+  function dewarp(E) {
+    const { w, h, d } = E, TH = 150;
+    const nS = clamp(Math.round(w / 80), 6, 18), sw = w / nS;
+    const prof = new Float32Array(h), raw = [];
+    for (let i = 0; i < nS; i++) raw.push(new Float32Array(h));
+    for (let y = 0; y < h; y++) { const r = y * w; for (let x = 0; x < w; x++) if (d[r + x] < TH) { prof[y]++; raw[Math.min(nS - 1, (x / sw) | 0)][y]++; } }
+    const sp = raw.map(p => { const q = new Float32Array(h); for (let y = 0; y < h; y++) q[y] = (p[Math.max(0, y - 1)] + p[y] + p[Math.min(h - 1, y + 1)]) / 3; return q; });
+    const period = rowPeriod(prof);
+    if (!period) return { img: E, maxShift: 0, note: 'no text lines found' };
+    const maxStep = clamp(Math.floor(period * 0.4), 2, 40), spanCap = Math.max(2, Math.floor(period * 0.45));
+    const nB = clamp(Math.round(h / (period * 7)), 1, 16), bh = h / nB, capS = h * 0.08, ci = (nS / 2) | 0;
+    let coefs = [];
+    for (let b = 0; b < nB; b++) {
+      const y0 = Math.floor(b * bh), y1 = Math.min(h, Math.floor((b + 1) * bh));
+      const ink = raw.map(p => { let s = 0; for (let y = y0; y < y1; y++) s += p[y]; return s; });
+      const minInk = Math.max(15, (y1 - y0) * sw * 0.01);
+      let ref = -1;
+      for (let k = 0; k < nS && ref < 0; k++) for (const c of [ci - k, ci + k]) if (c >= 0 && c < nS && ink[c] >= minInk) { ref = c; break; }
+      const s = new Float32Array(nS), ok = new Uint8Array(nS);
+      if (ref >= 0) {
+        ok[ref] = 1;
+        for (const dir of [1, -1]) {
+          let last = ref;
+          for (let i = ref + dir; i >= 0 && i < nS; i += dir) {
+            s[i] = s[last];
+            if (ink[i] < minInk) continue;
+            const span = Math.min(Math.abs(i - last) * maxStep, spanCap);
+            const r = matchShift(sp[last], s[last], sp[i], y0, y1, span);
+            if (r.score > 0.35 && Math.abs(r.shift) <= capS) { s[i] = r.shift; ok[i] = 1; last = i; }
+          }
+        }
+      }
+      const T = [], Y = [];
+      for (let i = 0; i < nS; i++) if (ok[i]) { T.push(((i + 0.5) * sw - w / 2) / (w / 2)); Y.push(s[i]); }
+      let c = [0, 0, 0, 0];
+      if (T.length >= 2) c = polyFit(T, Y, T.length >= 8 ? 3 : T.length >= 4 ? 2 : 1);
+      c[0] = 0; // anchor: center column never moves
+      coefs.push(c);
+    }
+    if (nB >= 3) coefs = coefs.map((c, b) => c.map((v, k) => (coefs[Math.max(0, b - 1)][k] + 2 * v + coefs[Math.min(nB - 1, b + 1)][k]) / 4));
+    let maxShift = 0;
+    const offs = coefs.map(c => {
+      const o = new Float32Array(w);
+      for (let x = 0; x < w; x++) {
+        const t = (x + 0.5 - w / 2) / (w / 2);
+        const v = clamp(c[1] * t + c[2] * t * t + c[3] * t * t * t, -capS, capS);
+        o[x] = v; if (Math.abs(v) > maxShift) maxShift = Math.abs(v);
+      }
+      return o;
+    });
+    if (maxShift < 0.75) return { img: E, maxShift, note: 'paper already flat' };
+    const out = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const gb = (y + 0.5) / bh - 0.5;
+      let b0 = Math.floor(gb), t = gb - b0;
+      if (b0 < 0) { b0 = 0; t = 0; } if (b0 >= nB - 1) { b0 = nB - 1; t = 0; }
+      const o0 = offs[b0], o1 = offs[Math.min(nB - 1, b0 + 1)];
+      for (let x = 0; x < w; x++) {
+        const sy = y + o0[x] + (o1[x] - o0[x]) * t, yy = Math.floor(sy), f = sy - yy;
+        out[y * w + x] = yy < 0 || yy >= h - 1 ? 255 : d[yy * w + x] * (1 - f) + d[(yy + 1) * w + x] * f;
+      }
+    }
+    return { img: { w, h, d: out }, maxShift, note: '' };
+  }
+
+  // ---------- 6. final black/white rendering ----------
+  function despeckle(bin, w, h) {
+    const kill = [];
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x; if (!bin[p]) continue;
+      const n = bin[p - 1] + bin[p + 1] + bin[p - w] + bin[p + w] + bin[p - w - 1] + bin[p - w + 1] + bin[p + w - 1] + bin[p + w + 1];
+      if (n <= 1) kill.push(p);
+    }
+    for (const p of kill) bin[p] = 0;
+  }
+
+  // remove big dark blobs touching the border (leftover background / table edge)
+  function cleanBorders(bin, w, h) {
+    const seen = new Uint8Array(w * h), removed = new Uint8Array(w * h), stack = new Int32Array(w * h);
+    const flood = start => {
+      let sp = 0, n = 0, x0 = w, x1 = 0, y0 = h, y1 = 0;
+      stack[sp++] = start; seen[start] = 1;
+      const list = [];
+      while (sp) {
+        const p = stack[--sp]; list.push(p); n++;
+        const x = p % w, y = (p / w) | 0;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        if (x > 0 && bin[p - 1] && !seen[p - 1]) { seen[p - 1] = 1; stack[sp++] = p - 1; }
+        if (x < w - 1 && bin[p + 1] && !seen[p + 1]) { seen[p + 1] = 1; stack[sp++] = p + 1; }
+        if (y > 0 && bin[p - w] && !seen[p - w]) { seen[p - w] = 1; stack[sp++] = p - w; }
+        if (y < h - 1 && bin[p + w] && !seen[p + w]) { seen[p + w] = 1; stack[sp++] = p + w; }
+      }
+      if (x1 - x0 > 0.12 * w || y1 - y0 > 0.12 * h) for (const p of list) { bin[p] = 0; removed[p] = 1; }
+    };
+    for (let x = 0; x < w; x++) { for (const p of [x, (h - 1) * w + x]) if (bin[p] && !seen[p]) flood(p); }
+    for (let y = 0; y < h; y++) { for (const p of [y * w, y * w + w - 1]) if (bin[p] && !seen[p]) flood(p); }
+    return removed;
+  }
+
+  function finalize(E, mode, thr) {
+    const { w, h, d } = E, T = thr * 255, bin = new Uint8Array(w * h);
+    for (let i = 0; i < bin.length; i++) bin[i] = d[i] < T ? 1 : 0;
+    despeckle(bin, w, h);
+    const removed = cleanBorders(bin, w, h);
+    const px = new Uint8ClampedArray(w * h * 4);
+    const lo = 0.25 * 255, hi = Math.min(250, T + 0.15 * 255);
+    for (let i = 0, j = 0; i < bin.length; i++, j += 4) {
+      const v = mode === 'binary' ? (bin[i] ? 0 : 255) : (removed[i] ? 255 : clamp((d[i] - lo) / (hi - lo) * 255, 0, 255));
+      px[j] = px[j + 1] = px[j + 2] = v; px[j + 3] = 255;
+    }
+    return { w, h, px };
+  }
+
+  // ---------- receipt text parsing ----------
+  const CATS = ['Groceries', 'Dining', 'Fuel', 'Transport', 'Shopping', 'Household', 'Health', 'Entertainment', 'Travel', 'Utilities', 'Office', 'Other'];
+  const CAT_RULES = [
+    ['Fuel', /\b(fuel|gasoline|unleaded|diesel|regular|premium|pump\s*#?\s*\d+|gallons?|chevron|exxon|mobil|arco|valero|texaco|sunoco)\b/i],
+    ['Dining', /\b(restaurant|cafe|café|coffee|espresso|latte|grill|pizza|burger|taco|sushi|ramen|kitchen|bistro|server|table\s*#?\s*\d+|gratuity|tip|guests?|dine[\s-]?in|take[\s-]?out|starbucks|mcdonald'?s)\b/i],
+    ['Groceries', /\b(grocery|groceries|supermarket|market|produce|deli|bakery|safeway|trader joe'?s|whole foods|kroger|ralphs|vons|albertsons|aldi|sprouts|lidl|tesco|sainsbury'?s|\/\s*lb|lb\s*@|kg\s*@)\b/i],
+    ['Health', /\b(pharmacy|rx|cvs|walgreens|rite aid|clinic|medical|dental|optical)\b/i],
+    ['Transport', /\b(parking|uber|lyft|taxi|cab|transit|toll|metro|garage)\b/i],
+    ['Travel', /\b(hotel|inn|airline|airport|flight|motel|resort|lodging)\b/i],
+    ['Household', /\b(home depot|lowe'?s|ikea|hardware|bed bath)\b/i],
+    ['Office', /\b(office depot|staples|fedex|ups store|usps|postage|printing)\b/i],
+    ['Entertainment', /\b(cinema|theater|theatre|movie|tickets?|concert|museum)\b/i],
+    ['Utilities', /\b(electric|utility|water bill|internet|wireless|phone bill)\b/i],
+    ['Shopping', /\b(target|walmart|costco|amazon|best buy|apparel|clothing|store)\b/i],
+  ];
+  const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+
+  const normLine = l => l
+    .replace(/\d[Oo]|[Oo]\d/g, m => m.replace(/[Oo]/, '0'))
+    .replace(/(\d)\s*[,.]\s*(\d{2})(?!\d)/g, '$1.$2')
+    .replace(/\$\s+(\d)/g, '$$$1');
+
+  function amounts(line) {
+    const re = /(-)?\$?(\d{1,3}(?:,\d{3})+|\d{1,6})\.(\d{2})(?!\d|\.\d)(-)?/g, out = [];
+    let m;
+    while ((m = re.exec(line))) {
+      let v = parseFloat(m[2].replace(/,/g, '') + '.' + m[3]);
+      if (m[1] || m[4]) v = -v;
+      out.push({ v, idx: m.index, end: m.index + m[0].length });
+    }
+    return out;
+  }
+
+  function findDate(text) {
+    const c = [];
+    let m;
+    const r1 = /\b(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})\b/g;
+    while ((m = r1.exec(text))) c.push([m.index, +m[1], +m[2], +m[3]]);
+    const r2 = /\b(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4}|\d{2})\b/g;
+    while ((m = r2.exec(text))) {
+      let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000;
+      let mo = a, da = b; if (a > 12 && b <= 12) { mo = b; da = a; }
+      c.push([m.index, y, mo, da]);
+    }
+    const mon = '(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\\.?';
+    const r3 = new RegExp('\\b' + mon + '\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4}|\\d{2})\\b', 'gi');
+    while ((m = r3.exec(text))) { let y = +m[3]; if (y < 100) y += 2000; c.push([m.index, y, MONTHS[m[1].toLowerCase()], +m[2]]); }
+    const r4 = new RegExp('\\b(\\d{1,2})[\\s-]+' + mon + '[\\s,-]+(\\d{4}|\\d{2})\\b', 'gi');
+    while ((m = r4.exec(text))) { let y = +m[3]; if (y < 100) y += 2000; c.push([m.index, y, MONTHS[m[2].toLowerCase()], +m[1]]); }
+    c.sort((a, b) => a[0] - b[0]);
+    const maxY = new Date().getFullYear() + 1;
+    for (const [, y, mo, da] of c) {
+      if (y < 2000 || y > maxY || mo < 1 || mo > 12 || da < 1 || da > 31) continue;
+      const dt = new Date(y, mo - 1, da);
+      if (dt.getMonth() !== mo - 1) continue;
+      return `${y}-${String(mo).padStart(2, '0')}-${String(da).padStart(2, '0')}`;
+    }
+    return '';
+  }
+
+  function titleCase(s) {
+    if (s !== s.toUpperCase()) return s;
+    return s.toLowerCase().replace(/\b([a-z])/g, c => c.toUpperCase()).replace(/'S\b/g, "'s");
+  }
+
+  function parseReceipt(text) {
+    const lines = text.split(/\r?\n/).map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const N = lines.map(normLine);
+    const res = { merchant: '', date: findDate(text), total: null, subtotal: null, tax: null, payment: '', category: 'Other', items: '' };
+
+    // merchant: first "wordy" line near the top
+    let mIdx = -1;
+    for (let i = 0; i < Math.min(8, lines.length); i++) {
+      const l = lines[i], letters = (l.match(/[A-Za-z]/g) || []).length;
+      if (letters < 3 || letters / l.replace(/\s/g, '').length < 0.6) continue;
+      if (/^(welcome|receipt|thank|tel|phone|www\.|http|store\s*#|date|time|cashier|order)/i.test(l)) continue;
+      if (/^\d/.test(l)) continue;
+      mIdx = i; res.merchant = titleCase(l.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9)'.&]+$/g, '')); break;
+    }
+
+    const strongRe = /grand\s*total|total\s*due|amount\s*due|balance\s*due|amt\s*due|total\s*amount|total\s*sale/i;
+    const totalRe = /\b(total|tota1|totai|totl)\b/i;
+    const notTotal = /sub\s*-?\s*tota|total\s*(sav|disc|items?|qty|tax|tender|number|#|count)|\btax\b|saved|savings|change|tender|items sold|points/i;
+    const strong = [], weak = [];
+    let subIdx = -1, firstTotIdx = -1, taxTotal = null, taxSum = 0, taxFound = false;
+
+    for (let i = 0; i < N.length; i++) {
+      const l = N[i];
+      let a = amounts(l);
+      if (/sub\s*-?\s*tota/i.test(l)) {
+        if (!a.length && N[i + 1]) a = amounts(N[i + 1]);
+        if (a.length) { res.subtotal = a[a.length - 1].v; if (subIdx < 0) subIdx = i; }
+        continue;
+      }
+      if (/total\s*tax|tax\s*total/i.test(l) && a.length) { taxTotal = a[a.length - 1].v; continue; }
+      if (/\b(sales\s*)?tax\b|\bvat\b|\bgst\b|\bhst\b|\bpst\b/i.test(l) && !/total|exempt/i.test(l) && a.length) { taxSum += a[a.length - 1].v; taxFound = true; continue; }
+      const isStrong = strongRe.test(l);
+      if ((isStrong || totalRe.test(l)) && !notTotal.test(l)) {
+        if (!a.length && N[i + 1] && !/[a-z]{3}/i.test(N[i + 1].replace(/\d|\$|\./g, ''))) a = amounts(N[i + 1]);
+        if (a.length) {
+          (isStrong ? strong : weak).push(a[a.length - 1].v);
+          if (firstTotIdx < 0) firstTotIdx = i;
+        }
+      }
+    }
+    if (taxTotal != null) res.tax = taxTotal; else if (taxFound) res.tax = Math.round(taxSum * 100) / 100;
+    const pick = strong.length ? strong : weak;
+    if (pick.length) res.total = Math.max(...pick);
+    else if (res.subtotal != null) res.total = Math.round((res.subtotal + (res.tax || 0)) * 100) / 100;
+    else {
+      let mx = null;
+      N.forEach(l => { if (/change|cash|tender|paid|points|saved/i.test(l)) return; amounts(l).forEach(a => { if (mx == null || a.v > mx) mx = a.v; }); });
+      res.total = mx;
+    }
+
+    // payment
+    const pm = text.match(/\b(visa|master\s*card|mastercard|amex|american express|discover|debit|credit|cash|apple\s*pay|google\s*pay|ebt|gift\s*card)\b/i);
+    if (pm) {
+      const k = pm[1].toLowerCase().replace(/\s+/g, ' ');
+      const map = { 'master card': 'Mastercard', mastercard: 'Mastercard', amex: 'Amex', 'american express': 'Amex', 'apple pay': 'Apple Pay', 'google pay': 'Google Pay', ebt: 'EBT', 'gift card': 'Gift card' };
+      res.payment = map[k] || (k[0].toUpperCase() + k.slice(1));
+      const last4 = text.match(/(?:[x*•#]{2,}[\s-]*)(\d{4})\b/i);
+      if (last4) res.payment += ' ••' + last4[1];
+    }
+
+    // category
+    for (const [cat, re] of CAT_RULES) if (re.test(text)) { res.category = cat; break; }
+
+    // items: lines with a trailing price between the header and the subtotal/total
+    const stop = [subIdx, firstTotIdx].filter(i => i >= 0);
+    const end = stop.length ? Math.min(...stop) : N.length;
+    const skip = /total|tax|change|cash|visa|master|amex|discover|debit|credit|tender|balance|payment|card|auth|approv|due|tip|gratuity|subtotal|savings|points|ref|trans|terminal/i;
+    const items = [];
+    for (let i = mIdx + 1; i < end; i++) {
+      const l = N[i]; if (skip.test(l)) continue;
+      const a = amounts(l); if (!a.length) continue;
+      const last = a[a.length - 1]; if (l.length - last.end > 4) continue;
+      const name = l.slice(0, last.idx).replace(/[\s$:*.@-]+$/, '').trim();
+      if ((name.match(/[A-Za-z]/g) || []).length < 2) continue;
+      items.push(`${name}  ${last.v.toFixed(2)}`);
+    }
+    res.items = items.join('\n');
+    return res;
+  }
+
+  return { grayFromRGBA, downscale, detectCorners, orderCorners, outputSize, warp, normalizeBg, rot90, looksSideways,
+           estimateSkew, rotate, dewarp, finalize, parseReceipt, boxBlur, CATS };
+})();
+</script>
+
+<!-- ================= App / UI ================= -->
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const todayISO = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+
+const S = { src: null, srcGray: null, corners: null, base: null, baseKey: '', rot: 0, E: null, result: null, conf: null, thumb: '' };
+const opts = { deskew: true, dewarp: true, mode: 'binary', thr: 0.72 };
+
+function toast(msg, ms = 2200) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), ms); }
+
+// ---------------- tabs ----------------
+$$('.tabs button').forEach(b => b.onclick = () => {
+  $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  $('#tab-scan').hidden = b.dataset.tab !== 'scan';
+  $('#tab-log').hidden = b.dataset.tab !== 'log';
+  if (b.dataset.tab === 'log') renderLog();
+  window.scrollTo({ top: 0 });
+});
+
+// ---------------- forms ----------------
+function formHTML() {
+  return `<div class="grid">
+    <label class="f full">Merchant<input name="merchant" autocomplete="off"></label>
+    <label class="f">Date<input name="date" type="date"></label>
+    <label class="f">Total<input name="total" inputmode="decimal" placeholder="0.00" autocomplete="off"></label>
+    <label class="f">Subtotal<input name="subtotal" inputmode="decimal" autocomplete="off"></label>
+    <label class="f">Tax<input name="tax" inputmode="decimal" autocomplete="off"></label>
+    <label class="f">Category<select name="category">${Core.CATS.map(c => `<option>${c}</option>`).join('')}</select></label>
+    <label class="f">Payment<input name="payment" list="payList" autocomplete="off"></label>
+    <label class="f full">Notes<input name="notes" autocomplete="off"></label>
+    <label class="f full">Items<textarea name="items" rows="5" placeholder="Item name  price — one per line"></textarea></label>
+  </div>`;
+}
+$('#entryForm').innerHTML = formHTML();
+$('#dlgForm').innerHTML = formHTML();
+const num = v => { if (v == null || v === '') return null; const n = parseFloat(String(v).replace(/[^\d.,-]/g, '').replace(/,(\d{2})$/, '.$1').replace(/,/g, '')); return isFinite(n) ? Math.round(n * 100) / 100 : null; };
+const fmtNum = v => v == null ? '' : Number(v).toFixed(2);
+function setForm(f, e) {
+  f.merchant.value = e.merchant || ''; f.date.value = e.date || todayISO();
+  f.total.value = fmtNum(e.total); f.subtotal.value = fmtNum(e.subtotal); f.tax.value = fmtNum(e.tax);
+  f.category.value = Core.CATS.includes(e.category) ? e.category : 'Other';
+  f.payment.value = e.payment || ''; f.notes.value = e.notes || ''; f.items.value = e.items || '';
+}
+function getForm(f) {
+  return { merchant: f.merchant.value.trim(), date: f.date.value, total: num(f.total.value), subtotal: num(f.subtotal.value),
+           tax: num(f.tax.value), category: f.category.value, payment: f.payment.value.trim(), notes: f.notes.value.trim(), items: f.items.value.trim() };
+}
+
+// ---------------- image input ----------------
+async function loadImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) { toast('That file is not an image'); return; }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image(); img.src = url; await img.decode();
+    const MAX = 3000, s = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    setSource(c);
+    ensureWorker().catch(() => {}); // warm up OCR in the background
+  } catch (e) { console.error(e); toast('Could not open that image'); }
+  finally { URL.revokeObjectURL(url); }
+}
+function setSource(canvas, keepCorners) {
+  S.src = canvas;
+  const px = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  S.srcGray = Core.grayFromRGBA(canvas.width, canvas.height, px);
+  S.base = null; S.baseKey = '';
+  if (!keepCorners) autoDetect();
+  $('#cropCard').hidden = false; $('#procCard').hidden = true; $('#resCard').hidden = true;
+  layoutCrop();
+  $('#cropCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function fullCorners() { const w = S.src.width, h = S.src.height, m = 0.02; return [[w * m, h * m], [w * (1 - m), h * m], [w * (1 - m), h * (1 - m)], [w * m, h * (1 - m)]]; }
+function autoDetect() {
+  const c = Core.detectCorners(S.srcGray);
+  S.corners = c || fullCorners();
+  $('#cropMsg').textContent = c ? 'Receipt found — drag corners to adjust' : 'Couldn’t find edges — drag the corners';
+  drawCrop();
+}
+$('#camIn').onchange = e => { loadImageFile(e.target.files[0]); e.target.value = ''; };
+$('#fileIn').onchange = e => { loadImageFile(e.target.files[0]); e.target.value = ''; };
+document.addEventListener('paste', e => {
+  const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
+  if (f) { $$('.tabs button')[0].click(); loadImageFile(f); }
+});
+const pick = $('#pickCard');
+['dragover', 'dragenter'].forEach(ev => pick.addEventListener(ev, e => { e.preventDefault(); pick.classList.add('drop'); }));
+['dragleave', 'drop'].forEach(ev => pick.addEventListener(ev, e => { e.preventDefault(); pick.classList.remove('drop'); }));
+pick.addEventListener('drop', e => loadImageFile(e.dataTransfer.files[0]));
+
+// ---------------- crop editor ----------------
+const cropC = $('#crop'), cctx = cropC.getContext('2d');
+let drag = null;
+function layoutCrop() {
+  if (!S.src) return;
+  const maxW = $('#cropStage').clientWidth || 320, maxH = Math.max(260, window.innerHeight * 0.6);
+  const s = Math.min(maxW / S.src.width, maxH / S.src.height), dpr = window.devicePixelRatio || 1;
+  cropC.style.width = Math.round(S.src.width * s) + 'px'; cropC.style.height = Math.round(S.src.height * s) + 'px';
+  cropC.width = Math.round(S.src.width * s * dpr); cropC.height = Math.round(S.src.height * s * dpr);
+  drawCrop();
+}
+window.addEventListener('resize', () => { clearTimeout(layoutCrop.t); layoutCrop.t = setTimeout(layoutCrop, 150); });
+function drawCrop() {
+  if (!S.src || !S.corners) return;
+  const k = cropC.width / S.src.width, dpr = window.devicePixelRatio || 1, W = cropC.width, H = cropC.height;
+  cctx.setTransform(1, 0, 0, 1, 0, 0);
+  cctx.drawImage(S.src, 0, 0, W, H);
+  const P = S.corners.map(([x, y]) => [x * k, y * k]);
+  cctx.beginPath(); cctx.rect(0, 0, W, H); cctx.moveTo(...P[0]); P.slice(1).forEach(p => cctx.lineTo(...p)); cctx.closePath();
+  cctx.fillStyle = 'rgba(0,0,0,.5)'; cctx.fill('evenodd');
+  cctx.beginPath(); cctx.moveTo(...P[0]); P.slice(1).forEach(p => cctx.lineTo(...p)); cctx.closePath();
+  cctx.lineWidth = 2 * dpr; cctx.strokeStyle = '#2dd4bf'; cctx.stroke();
+  P.forEach((p, i) => {
+    cctx.beginPath(); cctx.arc(p[0], p[1], (drag && drag.i === i ? 14 : 11) * dpr, 0, Math.PI * 2);
+    cctx.fillStyle = 'rgba(255,255,255,.9)'; cctx.fill(); cctx.lineWidth = 3 * dpr; cctx.strokeStyle = '#0f766e'; cctx.stroke();
+  });
+  if (drag) { // magnifier loupe so your finger doesn't hide the corner
+    const c = S.corners[drag.i], R = 58 * dpr, z = 3;
+    const lx = c[0] * k < W / 2 ? W - R - 10 * dpr : R + 10 * dpr, ly = R + 10 * dpr;
+    const srcR = R / (k * z);
+    cctx.save(); cctx.beginPath(); cctx.arc(lx, ly, R, 0, Math.PI * 2); cctx.clip();
+    cctx.fillStyle = '#000'; cctx.fillRect(lx - R, ly - R, 2 * R, 2 * R);
+    cctx.drawImage(S.src, c[0] - srcR, c[1] - srcR, 2 * srcR, 2 * srcR, lx - R, ly - R, 2 * R, 2 * R);
+    cctx.strokeStyle = '#2dd4bf'; cctx.lineWidth = 1.5 * dpr;
+    cctx.beginPath(); cctx.moveTo(lx - R, ly); cctx.lineTo(lx + R, ly); cctx.moveTo(lx, ly - R); cctx.lineTo(lx, ly + R); cctx.stroke();
+    cctx.restore();
+    cctx.beginPath(); cctx.arc(lx, ly, R, 0, Math.PI * 2); cctx.lineWidth = 3 * dpr; cctx.strokeStyle = '#fff'; cctx.stroke();
+  }
+}
+function evToImg(e) { const r = cropC.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * S.src.width, (e.clientY - r.top) / r.height * S.src.height]; }
+cropC.addEventListener('pointerdown', e => {
+  if (!S.corners) return;
+  const p = evToImg(e), r = cropC.getBoundingClientRect(), perCss = S.src.width / r.width;
+  let bi = -1, bd = Infinity;
+  S.corners.forEach((c, i) => { const d = Math.hypot(c[0] - p[0], c[1] - p[1]); if (d < bd) { bd = d; bi = i; } });
+  if (bd > 70 * perCss) return;
+  drag = { i: bi, off: [S.corners[bi][0] - p[0], S.corners[bi][1] - p[1]] };
+  cropC.setPointerCapture(e.pointerId); drawCrop(); e.preventDefault();
+});
+cropC.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = evToImg(e);
+  S.corners[drag.i] = [Math.min(S.src.width, Math.max(0, p[0] + drag.off[0])), Math.min(S.src.height, Math.max(0, p[1] + drag.off[1]))];
+  drawCrop();
+});
+const endDrag = () => { if (drag) { drag = null; drawCrop(); } };
+cropC.addEventListener('pointerup', endDrag); cropC.addEventListener('pointercancel', endDrag);
+
+$('#autoBtn').onclick = autoDetect;
+$('#fullBtn').onclick = () => { S.corners = fullCorners(); $('#cropMsg').textContent = 'Using the whole image'; drawCrop(); };
+$('#rotSrcBtn').onclick = () => {
+  const o = S.src, c = document.createElement('canvas'); c.width = o.height; c.height = o.width;
+  const x = c.getContext('2d'); x.translate(c.width, 0); x.rotate(Math.PI / 2); x.drawImage(o, 0, 0);
+  const H = o.height; S.corners = Core.orderCorners(S.corners.map(([px, py]) => [H - py, px]));
+  setSource(c, true);
+};
+
+// ---------------- processing pipeline ----------------
+async function buildBase() {
+  const key = JSON.stringify(S.corners.map(p => p.map(v => Math.round(v))));
+  if (S.base && S.baseKey === key) return false;
+  const sz = Core.outputSize(S.corners);
+  let src = S.srcGray;
+  if (sz.scale < 0.7) src = Core.boxBlur(src, 1); // light anti-alias when shrinking a lot
+  S.base = Core.normalizeBg(Core.warp(src, S.corners, sz.w, sz.h));
+  S.baseKey = key;
+  return true;
+}
+async function runPipeline() {
+  if (!S.base) return;
+  const info = [];
+  let E = Core.rot90(S.base, S.rot);
+  if (opts.deskew) {
+    const a = Core.estimateSkew(E);
+    if (Math.abs(a) > 0.15) { E = Core.rotate(E, a); info.push(`rotated ${a > 0 ? '+' : ''}${a.toFixed(1)}°`); }
+    else info.push('already level');
+  }
+  if (opts.dewarp) {
+    const r = Core.dewarp(E); E = r.img;
+    info.push(r.maxShift >= 0.75 ? `unwarped (max ${r.maxShift.toFixed(0)}px)` : `unwarp: ${r.note}`);
+  }
+  S.E = E; S.info = info;
+  renderOut();
+}
+function renderOut() {
+  if (!S.E) return;
+  const f = Core.finalize(S.E, opts.mode, opts.thr), c = $('#out');
+  c.width = f.w; c.height = f.h;
+  c.getContext('2d').putImageData(new ImageData(f.px, f.w, f.h), 0, 0);
+  $('#procInfo').textContent = `${f.w}×${f.h}px · perspective fixed · ${S.info.join(' · ')}`;
+}
+let busy = false;
+async function withBusy(btn, label, fn) {
+  if (busy) return; busy = true;
+  const old = btn.textContent; btn.textContent = label; btn.disabled = true; await nextFrame();
+  try { await fn(); } catch (e) { console.error(e); toast('Something went wrong: ' + e.message); }
+  finally { btn.textContent = old; btn.disabled = false; busy = false; }
+}
+$('#procBtn').onclick = () => withBusy($('#procBtn'), 'Processing…', async () => {
+  const fresh = await buildBase();
+  if (fresh) S.rot = Core.looksSideways(S.base) ? 1 : 0;
+  await runPipeline();
+  $('#procCard').hidden = false;
+  $('#procCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+const rerun = () => { clearTimeout(rerun.t); rerun.t = setTimeout(() => runPipeline(), 30); };
+$('#optDeskew').onchange = e => { opts.deskew = e.target.checked; rerun(); };
+$('#optDewarp').onchange = e => { opts.dewarp = e.target.checked; rerun(); };
+$$('#modeSeg button').forEach(b => b.onclick = () => { opts.mode = b.dataset.mode; $$('#modeSeg button').forEach(x => x.classList.toggle('on', x === b)); renderOut(); });
+$('#optThr').oninput = e => { opts.thr = +e.target.value; $('#thrVal').textContent = opts.thr.toFixed(2); clearTimeout(renderOut.t); renderOut.t = setTimeout(renderOut, 60); };
+$('#rotL').onclick = () => { S.rot = (S.rot + 3) % 4; rerun(); };
+$('#rotR').onclick = () => { S.rot = (S.rot + 1) % 4; rerun(); };
+$('#rot180').onclick = () => { S.rot = (S.rot + 2) % 4; rerun(); };
+
+// ---------------- OCR (tesseract.js, loaded on demand) ----------------
+const TESS_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+let workerP = null, progressCb = null;
+// If the deploy bundled the OCR engine into ./vendor/tesseract/, use it (fully offline after first use).
+// Otherwise fall back to the CDN (needs internet the first time).
+const LOCAL_TESS = new URL('vendor/tesseract/', location.href).href;
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { s.remove(); rej(new Error('Could not load OCR library (are you online?)')); }; document.head.appendChild(s); }); }
+function ensureWorker() {
+  if (!workerP) workerP = (async () => {
+    let local = false;
+    if (!window.Tesseract) {
+      try { await loadScript(LOCAL_TESS + 'tesseract.min.js'); local = true; }
+      catch (e) { await loadScript(TESS_URL); }
+    } else local = !!ensureWorker.local;
+    ensureWorker.local = local;
+    const opt = { logger: m => progressCb && progressCb(m) };
+    if (local) Object.assign(opt, {
+      workerPath: LOCAL_TESS + 'worker.min.js', corePath: LOCAL_TESS + 'core', langPath: LOCAL_TESS + 'lang', workerBlobURL: false
+    });
+    const w = await Tesseract.createWorker('eng', 1, opt);
+    await w.setParameters({ tessedit_pageseg_mode: '4', preserve_interword_spaces: '1', user_defined_dpi: '300' });
+    return w;
+  })().catch(e => { workerP = null; throw e; });
+  return workerP;
+}
+function setProg(p, text) { const el = $('#ocrProg'); el.hidden = false; el.firstElementChild.style.width = Math.round(p * 100) + '%'; el.lastElementChild.textContent = text; }
+progressCb = m => {
+  if (m.status === 'recognizing text') setProg(m.progress, `Reading text… ${Math.round(m.progress * 100)}%`);
+  else setProg(m.progress || 0.05, m.status ? m.status[0].toUpperCase() + m.status.slice(1) + '…' : 'Working…');
+};
+function rotatedCopy180(c) { const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; const x = o.getContext('2d'); x.translate(c.width, c.height); x.rotate(Math.PI); x.drawImage(c, 0, 0); return o; }
+
+$('#ocrBtn').onclick = () => withBusy($('#ocrBtn'), 'Reading…', async () => {
+  setProg(0.02, 'Loading OCR engine (first time can take a bit)…');
+  const w = await ensureWorker();
+  const canvas = $('#out');
+  let { data } = await w.recognize(canvas);
+  if ($('#optFlip').checked && data.confidence < 55) {
+    setProg(0, 'Low confidence — trying upside-down…');
+    const r2 = (await w.recognize(rotatedCopy180(canvas))).data;
+    if (r2.confidence > data.confidence + 5) { data = r2; S.rot = (S.rot + 2) % 4; await runPipeline(); toast('Image was upside-down — flipped it'); }
+  }
+  setProg(1, `Done · confidence ${Math.round(data.confidence)}%`);
+  S.conf = data.confidence;
+  $('#ocrText').value = data.text.trim();
+  $('#confVal').textContent = `(${Math.round(data.confidence)}% confidence)`;
+  S.thumb = makeThumb($('#out'));
+  fillFromText();
+  $('#resCard').hidden = false;
+  $('#resCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+function fillFromText() {
+  const p = Core.parseReceipt($('#ocrText').value);
+  setForm($('#entryForm'), { ...p, date: p.date || todayISO(), notes: '' });
+}
+$('#reparseBtn').onclick = () => { fillFromText(); toast('Fields re-filled from text'); };
+$('#copyTextBtn').onclick = () => navigator.clipboard?.writeText($('#ocrText').value).then(() => toast('Copied'), () => toast('Copy failed'));
+function makeThumb(c) {
+  const W = 280, s = Math.min(1, W / c.width), t = document.createElement('canvas');
+  t.width = Math.round(c.width * s); t.height = Math.round(Math.min(c.height * s, 1400));
+  const x = t.getContext('2d'); x.imageSmoothingQuality = 'high'; x.fillStyle = '#fff'; x.fillRect(0, 0, t.width, t.height);
+  x.drawImage(c, 0, 0, c.width, t.height / s, 0, 0, t.width, t.height);
+  return t.toDataURL('image/jpeg', 0.6);
+}
+$('#manualBtn').onclick = () => {
+  S.thumb = ''; S.conf = null; $('#ocrText').value = '';
+  setForm($('#entryForm'), { date: todayISO() });
+  $('#resCard').hidden = false; $('#resCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('#entryForm').merchant.focus();
+};
+function resetScan() {
+  Object.assign(S, { src: null, srcGray: null, corners: null, base: null, baseKey: '', rot: 0, E: null, thumb: '', conf: null });
+  ['#cropCard', '#procCard', '#resCard'].forEach(s => $(s).hidden = true);
+  $('#ocrProg').hidden = true; $('#ocrText').value = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+$('#newBtn').onclick = resetScan;
+
+// ---------------- log storage ----------------
+const KEY = 'receipt-log-v1', CUR_KEY = 'receipt-log-currency';
+let LOG = [], memOnly = false;
+function loadLog() {
+  try { LOG = JSON.parse(localStorage.getItem(KEY) || '[]'); if (!Array.isArray(LOG)) LOG = []; }
+  catch (e) { memOnly = true; LOG = []; }
+  try { const c = localStorage.getItem(CUR_KEY); if (c) $('#currencySel').value = c; } catch (e) {}
+  if (memOnly) $('#storeWarn').textContent = 'Storage unavailable — export before closing';
+  updateCount();
+}
+function persist() {
+  if (memOnly) return true;
+  try { localStorage.setItem(KEY, JSON.stringify(LOG)); return true; }
+  catch (e) {
+    // probably full: drop thumbnails from oldest entries and retry
+    const withThumbs = LOG.filter(x => x.thumb).sort((a, b) => a.created - b.created);
+    for (const x of withThumbs) { delete x.thumb; try { localStorage.setItem(KEY, JSON.stringify(LOG)); toast('Storage full — removed some old thumbnails'); return true; } catch (e2) {} }
+    toast('Could not save — storage is full. Export a backup.'); return false;
+  }
+}
+function updateCount() { $('#logCount').textContent = LOG.length; }
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+$('#saveBtn').onclick = () => {
+  const e = getForm($('#entryForm'));
+  if (!e.merchant && e.total == null) { toast('Add at least a merchant or a total'); return; }
+  LOG.push({ id: uid(), created: Date.now(), ...e, text: $('#ocrText').value, conf: S.conf, thumb: S.thumb || '' });
+  if (persist()) { updateCount(); toast(`Saved · ${e.merchant || 'receipt'} ${e.total != null ? money(e.total) : ''}`); resetScan(); }
+};
+
+// ---------------- log view ----------------
+const money = v => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: $('#currencySel').value }).format(v || 0); } catch (e) { return (v || 0).toFixed(2); } };
+$('#currencySel').onchange = e => { try { localStorage.setItem(CUR_KEY, e.target.value); } catch (x) {} renderLog(); };
+function monthLabel(ym) { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); }
+function filtered() {
+  const m = $('#fMonth').value, c = $('#fCat').value, q = $('#fSearch').value.trim().toLowerCase();
+  return LOG.filter(e => (!m || (e.date || '').startsWith(m)) && (!c || e.category === c) &&
+    (!q || [e.merchant, e.notes, e.items, e.text, e.payment].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.created - a.created);
+}
+function renderLog() {
+  const months = [...new Set(LOG.map(e => (e.date || '').slice(0, 7)).filter(Boolean))].sort().reverse();
+  const fm = $('#fMonth'), prevM = fm.value;
+  fm.innerHTML = `<option value="">All months</option>` + months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join('');
+  fm.value = months.includes(prevM) ? prevM : '';
+  const fc = $('#fCat'), prevC = fc.value;
+  fc.innerHTML = `<option value="">All categories</option>` + Core.CATS.map(c => `<option>${c}</option>`).join('');
+  fc.value = prevC;
+  const rows = filtered(), sum = rows.reduce((s, e) => s + (e.total || 0), 0);
+  $('#sumLabel').textContent = `${rows.length} receipt${rows.length === 1 ? '' : 's'}`;
+  $('#sumTotal').textContent = money(sum);
+  const byCat = {}; rows.forEach(e => byCat[e.category] = (byCat[e.category] || 0) + (e.total || 0));
+  $('#catChips').innerHTML = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<span class="chip">${esc(c)} <b>${money(v)}</b></span>`).join('');
+  $('#list').innerHTML = rows.length ? rows.map(e => `
+    <button class="item" data-id="${e.id}">
+      ${e.thumb ? `<img src="${e.thumb}" alt="">` : `<span class="ph"></span>`}
+      <span class="m"><div>${esc(e.merchant || 'Untitled')}</div><div class="muted small">${esc(e.date || '')} · ${esc(e.category)}${e.payment ? ' · ' + esc(e.payment) : ''}</div></span>
+      <span class="amt">${e.total != null ? money(e.total) : '—'}</span>
+    </button>`).join('') : `<div class="empty">${LOG.length ? 'No receipts match these filters.' : 'No receipts yet. Scan one from the Scan tab.'}</div>`;
+  $$('#list .item').forEach(b => b.onclick = () => openEntry(b.dataset.id));
+}
+['#fMonth', '#fCat'].forEach(s => $(s).onchange = renderLog);
+$('#fSearch').oninput = () => { clearTimeout(renderLog.t); renderLog.t = setTimeout(renderLog, 150); };
+
+let editId = null;
+function openEntry(id) {
+  const e = LOG.find(x => x.id === id); if (!e) return;
+  editId = id; setForm($('#dlgForm'), e);
+  $('#dlgText').value = e.text || '';
+  const img = $('#dlgImg'); img.hidden = !e.thumb; if (e.thumb) img.src = e.thumb;
+  $('#dlg').showModal();
+}
+$('#dlgClose').onclick = () => $('#dlg').close();
+$('#dlgSave').onclick = () => {
+  const e = LOG.find(x => x.id === editId); if (!e) return;
+  Object.assign(e, getForm($('#dlgForm')), { text: $('#dlgText').value });
+  persist(); $('#dlg').close(); renderLog(); toast('Updated');
+};
+$('#dlgDel').onclick = () => {
+  if (!confirm('Delete this receipt?')) return;
+  LOG = LOG.filter(x => x.id !== editId); persist(); updateCount(); $('#dlg').close(); renderLog(); toast('Deleted');
+};
+
+// ---------------- export / import ----------------
+async function download(name, mime, text) {
+  // iPhone/iPad: use the share sheet (Save to Files, AirDrop, Mail…). Downloads from a home-screen app are unreliable.
+  try {
+    const file = new File([text], name, { type: mime });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function toCSV(rows) {
+  const cols = ['date', 'merchant', 'category', 'subtotal', 'tax', 'total', 'payment', 'notes', 'items'];
+  const q = v => { const s = v == null ? '' : String(v).replace(/\n/g, ' | '); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  return [cols.join(','), ...rows.map(r => cols.map(c => q(c === 'total' || c === 'tax' || c === 'subtotal' ? (r[c] == null ? '' : r[c].toFixed(2)) : r[c])).join(','))].join('\n');
+}
+$('#csvBtn').onclick = () => { const r = filtered(); if (!r.length) return toast('Nothing to export'); download(`receipts-${todayISO()}.csv`, 'text/csv', toCSV(r)); };
+$('#copyCsvBtn').onclick = () => { const r = filtered(); if (!r.length) return toast('Nothing to copy'); navigator.clipboard?.writeText(toCSV(r)).then(() => toast('CSV copied — paste into a spreadsheet'), () => toast('Copy failed')); };
+$('#jsonBtn').onclick = () => download(`receipts-backup-${todayISO()}.json`, 'application/json', JSON.stringify(LOG));
+$('#importIn').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text()); if (!Array.isArray(data)) throw new Error('not a list');
+    const ids = new Set(LOG.map(x => x.id)); let n = 0;
+    for (const x of data) if (x && typeof x === 'object') { if (!x.id || ids.has(x.id)) { if (x.id && ids.has(x.id)) continue; x.id = uid(); } x.created = x.created || Date.now(); x.category = x.category || 'Other'; LOG.push(x); n++; }
+    persist(); updateCount(); renderLog(); toast(`Imported ${n} receipt${n === 1 ? '' : 's'}`);
+  } catch (err) { toast('That file is not a valid backup'); }
+};
+
+loadLog();
+
+// ---------------- installable web app ----------------
+(() => {
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  let dismissed = false; try { dismissed = localStorage.getItem('install-tip-dismissed') === '1'; } catch (e) {}
+  if (isIOS && !standalone && !dismissed) $('#installTip').hidden = false;
+  $('#installClose').onclick = () => { $('#installTip').hidden = true; try { localStorage.setItem('install-tip-dismissed', '1'); } catch (e) {} };
+
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw && nw.addEventListener('statechange', () => {
+            if (nw.state === 'activated' && navigator.serviceWorker.controller) toast('App updated — changes apply next time you open it', 3500);
+          });
+        });
+      }).catch(err => console.warn('Service worker not registered', err));
+    });
+  }
+  // Ask the browser not to evict saved receipts under storage pressure.
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {});
+})();
+</script>
+</body>
+</html>
